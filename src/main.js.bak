@@ -151,8 +151,8 @@ async function obtenerNombre(playerId) {
   // --- Historial ---
   const historial = [];
 
-  async function agregarAlHistorial(playerId, vS, vM, vm) {
-    const nombre = await obtenerNombre(playerId);
+  function agregarAlHistorial(playerId, vS, vM, vm) {
+    const nombre = nombresCache.get(playerId) || "Jugador";
     const total = vS + vM + vm;
     historial.unshift({ nombre, total, vS, vM, vm });
     if (historial.length > MAX_HISTORIAL) historial.pop();
@@ -210,7 +210,7 @@ async function obtenerNombre(playerId) {
   OBR.broadcast.onMessage(CANAL_TIRADA, (event) => {
     const { playerId, dS: rS, dMayor: rM, dMenor: rm } = event.data;
     mostrarResultado(rS, rM, rm, false);
-    agregarAlHistorial(playerId, rS, rM, rm);   // ya es async, no hace falta await
+    agregarAlHistorial(playerId, rS, rM, rm);
   });
 
   // --- Ajuste responsivo ---
