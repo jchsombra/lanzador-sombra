@@ -1,6 +1,9 @@
 import "./style.css";
 import * as THREE from "three";
 import { createD10, showNumber } from "./dice.js";
+import OBR from "@owlbear-rodeo/sdk";
+
+const CANAL_TIRADA = "lanzador-sombra/tirada";
 
 // --- Sonido de dados (sintetizado, sin archivos externos) ---
 let audioCtx = null;
@@ -104,16 +107,13 @@ function tiradaSombra() {
 
 function lanzar() {
   const { dS: vS, dMayor: vM, dMenor: vm } = tiradaSombra();
-  showNumber(dS, vS);
-  showNumber(dMayor, vM);
-  showNumber(dMenor, vm);
+  
+  // Actualizamos los dados y la suma en nuestra pantalla
+  mostrarResultado(vS, vM, vm);
 
-  // Actualizamos la suma total
-  const total = vS + vM + vm;
-  document.querySelector(".resultado").textContent = `Suma: ${total}`;
+  // Enviamos la tirada a los demás jugadores
+  OBR.broadcast.sendMessage(CANAL_TIRADA, { dS: vS, dMayor: vM, dMenor: vm });
 
-  // Sonido de dados cayendo
-  sonidoDados();
 }
 
 // --- Animación ---
@@ -139,4 +139,26 @@ window.addEventListener("resize", () => {
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   renderer.setSize(w, h);
+});
+
+function mostrarResultado(vS, vM, vm) {
+  showNumber(dS, vS);
+  showNumber(dMayor, vM);
+  showNumber(dMenor, vm);
+
+  const total = vS + vM + vm;
+  document.querySelector(".resultado").textContent = `Suma: ${total}`;
+
+  sonidoDados();
+}
+
+// Escuchamos las tiradas de otros jugadores
+OBR.broadcast.onMessage(CANAL_TIRADA, (event) => {
+  const { dS: vS, dMayor: vM, dMenor: vm } = event.data;
+  // Actualizamos los dados con los valores recibidos, pero sin sonido
+  showNumber(dS, vS);
+  showNumber(dMayor, vM);
+  showNumber(dMenor, vm);
+  const total = vS + vM + vm;
+  document.querySelector(".resultado").textContent = `Suma: ${total}`;
 });
