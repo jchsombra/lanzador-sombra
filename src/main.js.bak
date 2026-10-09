@@ -112,7 +112,7 @@ function lanzar() {
   mostrarResultado(vS, vM, vm);
 
   // Enviamos la tirada a los demás jugadores
-  OBR.broadcast.sendMessage(CANAL_TIRADA, { dS: vS, dMayor: vM, dMenor: vm }); {destination: "ALL" });
+  OBR.broadcast.sendMessage(CANAL_TIRADA, { dS: vS, dMayor: vM, dMenor: vm });
 
 }
 
