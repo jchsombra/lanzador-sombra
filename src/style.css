@@ -63,3 +63,55 @@ body {
   padding: 2px 0 0px;
   user-select: none;
 }
+
+.historial {
+  width: 100%;
+  max-height: 130px;
+  overflow-y: auto;
+  font-size: 13px;
+  color: #ddd;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 4px 0;
+  margin-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.historial:empty {
+  display: none;
+}
+
+.historial-item {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.historial-item:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.historial-nombre {
+  flex: 1;
+  font-weight: 600;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.historial-suma {
+  font-weight: bold;
+  color: #ffd966;
+  min-width: 26px;
+  text-align: right;
+}
+
+.historial-detalle {
+  color: #aaa;
+  font-family: "Consolas", monospace;
+  font-size: 12px;
+}

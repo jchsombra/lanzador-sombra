@@ -4,8 +4,9 @@ import { createD10, showNumber } from "./dice.js";
 import OBR from "@owlbear-rodeo/sdk";
 
 const CANAL_TIRADA = "lanzador-sombra/tirada";
+const MAX_HISTORIAL = 10;
 
-// --- Sonido de dados (sintetizado, sin archivos externos) ---
+// --- Sonido de dados (sintetizado) ---
 let audioCtx = null;
 
 function asegurarAudio() {
@@ -19,7 +20,6 @@ function sonidoDados() {
   const ctx = asegurarAudio();
   const now = ctx.currentTime;
 
-  // 6 "clacs" cortos con ligeras variaciones, imitando dados cayendo
   for (let i = 0; i < 6; i++) {
     const t = now + i * 0.07 + Math.random() * 0.05;
     const osc = ctx.createOscillator();
@@ -38,9 +38,33 @@ function sonidoDados() {
   }
 }
 
-// --- TODO se inicializa cuando el SDK de Owlbear está listo ---
-OBR.onReady(() => {
+// --- Cache de nombres de jugadores ---
+const nombresCache = new Map();
+
+// --- Utilidad: escapar HTML para evitar problemas con nombres raros ---
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  }[c]));
+}
+
+OBR.onReady(async () => {
   console.log("SDK de Owlbear listo. Inicializando lanzador...");
+
+  const miId = await OBR.player.getId();
+
+  // Precargamos los nombres de los jugadores conectados
+  const playersIniciales = await OBR.party.getPlayers();
+  playersIniciales.forEach((p) => nombresCache.set(p.id, p.name));
+
+  // Actualizamos el cache cuando alguien entra o sale
+  OBR.party.onChange((party) => {
+    party.forEach((p) => nombresCache.set(p.id, p.name));
+  });
 
   // --- Escena 3D ---
   const container = document.getElementById("dice-container");
@@ -58,10 +82,10 @@ OBR.onReady(() => {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setSize(container.clientWidth, container.clientHeight);
-  renderer.setClearColor(0x000000, 0); // Fondo transparente
+  renderer.setClearColor(0x000000, 0);
   container.appendChild(renderer.domElement);
 
-  // --- Luces ---
+  // Luces
   scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.0));
 
   const key = new THREE.DirectionalLight(0xffffff, 1.4);
@@ -76,7 +100,7 @@ OBR.onReady(() => {
   rim.position.set(-3, 4, -6);
   scene.add(rim);
 
-  // --- Dados ---
+  // Dados
   const SHOW_NUMBERS = true;
 
   const dS = createD10("#111111", "#ffffff", SHOW_NUMBERS);
@@ -101,7 +125,6 @@ OBR.onReady(() => {
     };
   }
 
-  // Muestra un resultado en pantalla. `conSonido` controla si suenan los dados.
   function mostrarResultado(vS, vM, vm, conSonido) {
     showNumber(dS, vS);
     showNumber(dMayor, vM);
@@ -115,17 +138,44 @@ OBR.onReady(() => {
     }
   }
 
-  // Lanza los dados localmente y envía la tirada a los demás jugadores
+  // --- Historial ---
+  const historial = [];
+
+  function agregarAlHistorial(playerId, vS, vM, vm) {
+    const nombre = nombresCache.get(playerId) || "Jugador";
+    const total = vS + vM + vm;
+    historial.unshift({ nombre, total, vS, vM, vm });
+    if (historial.length > MAX_HISTORIAL) historial.pop();
+    renderHistorial();
+  }
+
+  function renderHistorial() {
+    const contenedor = document.querySelector(".historial");
+    if (!contenedor) return;
+    contenedor.innerHTML = historial
+      .map(
+        (h) => `
+        <div class="historial-item">
+          <span class="historial-nombre">${escapeHtml(h.nombre)}</span>
+          <span class="historial-suma">${h.total}</span>
+          <span class="historial-detalle">(${h.vS}, ${h.vM}, ${h.vm})</span>
+        </div>`
+      )
+      .join("");
+  }
+
+  // --- Lanzar dados ---
   function lanzar() {
-    // Desbloquear el AudioContext en la primera interacción del usuario
     if (audioCtx && audioCtx.state === "suspended") {
       audioCtx.resume();
     }
 
     const { dS: vS, dMayor: vM, dMenor: vm } = tiradaSombra();
     mostrarResultado(vS, vM, vm, true);
+    agregarAlHistorial(miId, vS, vM, vm);
 
     OBR.broadcast.sendMessage(CANAL_TIRADA, {
+      playerId: miId,
       dS: vS,
       dMayor: vM,
       dMenor: vm,
@@ -142,19 +192,18 @@ OBR.onReady(() => {
   // --- Botón de relanzar ---
   document.querySelector(".relanzar").addEventListener("click", lanzar);
 
-  // --- Primera tirada (sin sonido, sin broadcast) ---
+  // --- Primera tirada (sin sonido, sin broadcast, sin historial) ---
   const { dS: vS0, dMayor: vM0, dMenor: vm0 } = tiradaSombra();
   mostrarResultado(vS0, vM0, vm0, false);
 
   // --- Escucha de tiradas de otros jugadores ---
   OBR.broadcast.onMessage(CANAL_TIRADA, (event) => {
-    console.log("Tirada recibida de otro jugador:", event.data);
-    const { dS: rS, dMayor: rM, dMenor: rm } = event.data;
-    // Mostramos el resultado recibido, pero sin sonido (ya lo oiría el emisor)
+    const { playerId, dS: rS, dMayor: rM, dMenor: rm } = event.data;
     mostrarResultado(rS, rM, rm, false);
+    agregarAlHistorial(playerId, rS, rM, rm);
   });
 
-  // --- Ajuste responsivo si cambia el tamaño del contenedor ---
+  // --- Ajuste responsivo ---
   window.addEventListener("resize", () => {
     const w = container.clientWidth;
     const h = container.clientHeight;
