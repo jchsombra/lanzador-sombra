@@ -7,6 +7,7 @@ const CANAL_TIRADA = "lanzador-sombra/tirada";
 
 // --- Sonido de dados (sintetizado, sin archivos externos) ---
 let audioCtx = null;
+
 function asegurarAudio() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -18,8 +19,7 @@ function sonidoDados() {
   const ctx = asegurarAudio();
   const now = ctx.currentTime;
 
-  // Generamos 6 "clacs" cortos, con ligeras variaciones de tono y tiempo,
-  // para imitar el sonido de varios dados cayendo sobre una mesa.
+  // 6 "clacs" cortos con ligeras variaciones, imitando dados cayendo
   for (let i = 0; i < 6; i++) {
     const t = now + i * 0.07 + Math.random() * 0.05;
     const osc = ctx.createOscillator();
@@ -38,130 +38,128 @@ function sonidoDados() {
   }
 }
 
-// --- Escena 3D ---
-const container = document.getElementById("dice-container");
-
-const scene = new THREE.Scene();
-
-const camera = new THREE.PerspectiveCamera(
-  40,
-  container.clientWidth / container.clientHeight,
-  0.1,
-  100
-);
-camera.position.set(0, 0, 7);
-
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.setSize(container.clientWidth, container.clientHeight);
-renderer.setClearColor(0x000000, 0); // Fondo transparente
-container.appendChild(renderer.domElement);
-
-// Luces
-// Luz ambiental cálida desde arriba y fría desde abajo (más natural)
-scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.0));
-
-// Luz principal
-const key = new THREE.DirectionalLight(0xffffff, 1.4);
-key.position.set(3, 5, 6);
-scene.add(key);
-
-// Luz de relleno desde el lado opuesto
-const fill = new THREE.DirectionalLight(0xffffff, 0.6);
-fill.position.set(-4, -2, 4);
-scene.add(fill);
-
-// Luz de contra para dar un punto de brillo
-const rim = new THREE.DirectionalLight(0xffffff, 0.4);
-rim.position.set(-3, 4, -6);
-scene.add(rim);
-
-// --- Dados ---
-// dS: negro con número blanco. d+ y d-: blanco con número negro.
-// Ponlo en true cuando quieras ver los números. Ahora lo dejamos sin números
-// para comprobar la forma del dado primero.
-
-const SHOW_NUMBERS = true;
-
-const dS = createD10("#111111", "#ffffff", SHOW_NUMBERS);
-const dMayor = createD10("#f5f5f5", "#111111", SHOW_NUMBERS);
-const dMenor = createD10("#f5f5f5", "#111111", SHOW_NUMBERS);
-
-dS.position.set(-1.8, 0, 0);
-dMayor.position.set(0, 0, 0);
-dMenor.position.set(1.8, 0, 0);
-
-scene.add(dS, dMayor, dMenor);
-
-// --- Lógica del Sistema Sombra ---
-function tiradaSombra() {
-  const dSVal = Math.floor(Math.random() * 10) + 1;
-  const a = Math.floor(Math.random() * 10) + 1;
-  const b = Math.floor(Math.random() * 10) + 1;
-  return {
-    dS: dSVal,
-    dMayor: Math.max(a, b),
-    dMenor: Math.min(a, b),
-  };
-}
-
-function lanzar() {
-  const { dS: vS, dMayor: vM, dMenor: vm } = tiradaSombra();
-  
-  // Actualizamos los dados y la suma en nuestra pantalla
-  mostrarResultado(vS, vM, vm);
-
-  // Enviamos la tirada a los demás jugadores
-  OBR.broadcast.sendMessage(CANAL_TIRADA, { dS: vS, dMayor: vM, dMenor: vm }); {destination: "ALL" });
-
-}
-
-// --- Animación ---
-function animate() {
-  requestAnimationFrame(animate);
-  // Un pequeño giro de cámara da sensación de volumen (opcional)
-  // camera.position.x = Math.sin(Date.now() * 0.0003) * 0.3;
-  // camera.lookAt(0, 0, 0);
-  renderer.render(scene, camera);
-}
-animate();
-
-// --- Botón de relanzar ---
-document.querySelector(".relanzar").addEventListener("click", lanzar);
-
-// Primera tirada
-lanzar();
-
-// Ajuste responsivo si el contenedor cambia de tamaño
-window.addEventListener("resize", () => {
-  const w = container.clientWidth;
-  const h = container.clientHeight;
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
-  renderer.setSize(w, h);
-});
-
-function mostrarResultado(vS, vM, vm) {
-  showNumber(dS, vS);
-  showNumber(dMayor, vM);
-  showNumber(dMenor, vm);
-
-  const total = vS + vM + vm;
-  document.querySelector(".resultado").textContent = `Suma: ${total}`;
-
-  sonidoDados();
-}
-
-// Escuchamos las tiradas de otros jugadores, pero solo cuando el SDK esté listo
+// --- TODO se inicializa cuando el SDK de Owlbear está listo ---
 OBR.onReady(() => {
-  console.log("SDK de Owlbear listo. Escuchando tiradas...");
-  OBR.broadcast.onMessage(CANAL_TIRADA, (event) => {
-    console.log("¡Tirada recibida de otro jugador!", event.data);
-    const { dS: vS, dMayor: vM, dMenor: vm } = event.data;
+  console.log("SDK de Owlbear listo. Inicializando lanzador...");
+
+  // --- Escena 3D ---
+  const container = document.getElementById("dice-container");
+
+  const scene = new THREE.Scene();
+
+  const camera = new THREE.PerspectiveCamera(
+    40,
+    container.clientWidth / container.clientHeight,
+    0.1,
+    100
+  );
+  camera.position.set(0, 0, 7);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(container.clientWidth, container.clientHeight);
+  renderer.setClearColor(0x000000, 0); // Fondo transparente
+  container.appendChild(renderer.domElement);
+
+  // --- Luces ---
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.0));
+
+  const key = new THREE.DirectionalLight(0xffffff, 1.4);
+  key.position.set(3, 5, 6);
+  scene.add(key);
+
+  const fill = new THREE.DirectionalLight(0xffffff, 0.6);
+  fill.position.set(-4, -2, 4);
+  scene.add(fill);
+
+  const rim = new THREE.DirectionalLight(0xffffff, 0.4);
+  rim.position.set(-3, 4, -6);
+  scene.add(rim);
+
+  // --- Dados ---
+  const SHOW_NUMBERS = true;
+
+  const dS = createD10("#111111", "#ffffff", SHOW_NUMBERS);
+  const dMayor = createD10("#f5f5f5", "#111111", SHOW_NUMBERS);
+  const dMenor = createD10("#f5f5f5", "#111111", SHOW_NUMBERS);
+
+  dS.position.set(-1.8, 0, 0);
+  dMayor.position.set(0, 0, 0);
+  dMenor.position.set(1.8, 0, 0);
+
+  scene.add(dS, dMayor, dMenor);
+
+  // --- Lógica del Sistema Sombra ---
+  function tiradaSombra() {
+    const dSVal = Math.floor(Math.random() * 10) + 1;
+    const a = Math.floor(Math.random() * 10) + 1;
+    const b = Math.floor(Math.random() * 10) + 1;
+    return {
+      dS: dSVal,
+      dMayor: Math.max(a, b),
+      dMenor: Math.min(a, b),
+    };
+  }
+
+  // Muestra un resultado en pantalla. `conSonido` controla si suenan los dados.
+  function mostrarResultado(vS, vM, vm, conSonido) {
     showNumber(dS, vS);
     showNumber(dMayor, vM);
     showNumber(dMenor, vm);
+
     const total = vS + vM + vm;
     document.querySelector(".resultado").textContent = `Suma: ${total}`;
+
+    if (conSonido) {
+      sonidoDados();
+    }
+  }
+
+  // Lanza los dados localmente y envía la tirada a los demás jugadores
+  function lanzar() {
+    // Desbloquear el AudioContext en la primera interacción del usuario
+    if (audioCtx && audioCtx.state === "suspended") {
+      audioCtx.resume();
+    }
+
+    const { dS: vS, dMayor: vM, dMenor: vm } = tiradaSombra();
+    mostrarResultado(vS, vM, vm, true);
+
+    OBR.broadcast.sendMessage(CANAL_TIRADA, {
+      dS: vS,
+      dMayor: vM,
+      dMenor: vm,
+    });
+  }
+
+  // --- Animación ---
+  function animate() {
+    requestAnimationFrame(animate);
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // --- Botón de relanzar ---
+  document.querySelector(".relanzar").addEventListener("click", lanzar);
+
+  // --- Primera tirada (sin sonido, sin broadcast) ---
+  const { dS: vS0, dMayor: vM0, dMenor: vm0 } = tiradaSombra();
+  mostrarResultado(vS0, vM0, vm0, false);
+
+  // --- Escucha de tiradas de otros jugadores ---
+  OBR.broadcast.onMessage(CANAL_TIRADA, (event) => {
+    console.log("Tirada recibida de otro jugador:", event.data);
+    const { dS: rS, dMayor: rM, dMenor: rm } = event.data;
+    // Mostramos el resultado recibido, pero sin sonido (ya lo oiría el emisor)
+    mostrarResultado(rS, rM, rm, false);
+  });
+
+  // --- Ajuste responsivo si cambia el tamaño del contenedor ---
+  window.addEventListener("resize", () => {
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
   });
 });
