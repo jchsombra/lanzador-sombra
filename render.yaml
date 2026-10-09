@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: lanzador-sombra
+    env: static
+    buildCommand: npm run build
+    staticPublishPath: dist
+    headers:
+      - path: /*
+        name: Access-Control-Allow-Origin
+        value: https://www.owlbear.rodeo

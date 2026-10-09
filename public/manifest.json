@@ -1,0 +1,14 @@
+{
+  "name": "Lanzador Sombra",
+  "version": "1.0.0",
+  "manifest_version": 1,
+  "description": "Lanzador de dados para el Sistema Sombra",
+  "icon": "/icon.svg",
+  "action": {
+    "title": "Lanzador Sombra",
+    "icon": "/icon.svg",
+    "popover": "/",
+    "height": 600,
+    "width": 400
+  }
+}
